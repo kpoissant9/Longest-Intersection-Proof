@@ -142,12 +142,14 @@
 
 ;; Get the longest intersection beginning with the any part of a and any part of b.
 ;; Iterates through a
+
 (definec list-intersect-iterate-through-a (a :tl b :tl acc :nlol) :nlol
   (let ((inter (list-intersect-iterate-through-b a b '())))
     (cond ((endp a) acc)
           ((> (len inter) (len (car acc))) (list-intersect-iterate-through-a (cdr a) b (list inter)))
           ((and (== (len inter) (len (car acc))) (not (in2 inter acc)) (> (len (car acc)) 0)) (list-intersect-iterate-through-a (cdr a) b (app2 acc (list inter))))
           (t (list-intersect-iterate-through-a (cdr a) b acc)))))
+
 
 (check= (list-intersect-iterate-through-a '() '() '()) '())
 (check= (list-intersect-iterate-through-a '() '(a b) '()) '())
@@ -159,6 +161,7 @@
 (check= (list-intersect-iterate-through-a '(a) '(a) '((a b c))) '((a b c)))
 (check= (list-intersect-iterate-through-a '(i m n r a t e) '(i m n g r a t e) '()) '((r a t e)))
 (check= (list-intersect-iterate-through-a '(a b c d e) '(a b q d e) '()) '((a b) (d e)))
+(check= (list-intersect-iterate-through-a '(a b a b a) '(b a b a b) '()) '((a b a b) (b a b a)))
 
 ;; Wrapper for list-intersect-iterate-through-a to call with an empty list accumulator
 (definec my-list-intersect (a :tl b :tl) :nlol
@@ -178,12 +181,18 @@
 (check= (my-list-intersect '(i a m i r a t e) '(i a m i g r a t e)) '((i a m i) (r a t e)))
 (check= (my-list-intersect '(a b c) '(a b c a b c)) '((a b c)))
 (check= (my-list-intersect '(a b) '(b a)) '((a) (b)))
+(check= (my-list-intersect '(a b a) '(b a b)) '((a b) (b a)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;; List Length Function Definitions ;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 ;; Returns the smaller length of two lists
 (definec smaller-len (x :tl y :tl) :nat
   (if (< (len2 x) (len2 y)) (len2 x) (len2 y)))
+
+(check= (smaller-len '(a b c) '(a b)) 2)
+(check= (smaller-len '() '()) 0)
+(check= (smaller-len '(a) '(a b c)) 1)
+
 
 ;; Gets the total length of all lists within a list of lists
 (definec all-len (x :nlol) :nat
@@ -206,6 +215,16 @@
 (check= (same-length '()) t)
 (check= (same-length '((1 2) (1 2 3 4))) nil)
 (check= (same-length '((1 2))) t)
+
+;; Our calulated upper-bound for the list of longest intersections between two lists
+(definec upper-bound (n :nat) :nat
+  (* (ceiling (/ n 2) 1) (+ (floor (/ n 2) 1) 1)))
+
+(check= (upper-bound 0) 0)
+(check= (upper-bound 1) 1)
+(check= (upper-bound 4) 6)
+(check= (upper-bound 5) 9)
+(check= (upper-bound 15) 64)
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;; Sublist Function Definitions ;;;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -242,10 +261,12 @@
 (check= (sublistp '(1 2 3) '(1 1 2 3)) t)
 (check= (sublistp '(1 2 3) '(1 2 4 1 2 3)) t)
 
+
 ;;use for my-list-intersect
 (definec lol-sublist (lol :nlol l :tl) :bool
   (cond ((endp lol) t)
         (t (and (sublistp (car lol) l) (lol-sublist (cdr lol) l)))))
+
 
 (check= (lol-sublist '() '(a b c d)) t)
 (check= (lol-sublist '((1 2) (3 4)) '(1 2 3 4)) t)
@@ -255,7 +276,7 @@
 
 
 
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;; LEMMAS ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;; LEMMAS ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;; Length Lemmas ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -349,6 +370,7 @@
                     (sublistp (list-intersect-iterate-through-b a b acc) b))
                (equal (list-intersect-iterate-through-b a b acc) acc))))
 
+
 ;; Lemma about list-intersect-iterate-through-b returning a sublist of either a or b
 (defthm list-intersect-iterate-through-b-returns-actual-sublist
   (implies (and (tlp a)
@@ -372,27 +394,29 @@
                 (<= (len2 (list-intersect-iterate-through-b a b acc)) (len2 b))))
   :hints (("Goal" :use ((:instance list-intersect-iterate-through-b-returns-actual-sublist (a a) (b b) (acc acc))))))
 
+
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;; lol-sublist Lemmas ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 ;; Lemma that says if the intersection between (cdr a) and b is a lol-sublist of (cdr a),
 ;; then the intersection between a and b is a lol-sublist of a
 (skip-proofs (defthm list-intersect-iterate-through-a-lol-sublist-induct
-  (IMPLIES (AND A
-              (LOL-SUBLIST (LIST-INTERSECT-ITERATE-THROUGH-A (CDR A)
-                                                             B NIL)
-                           (CDR A))
-              (CONSP A)
-              (TLP (CDR A))
-              (TLP B))
-         (LOL-SUBLIST (LIST-INTERSECT-ITERATE-THROUGH-A A B NIL)
-                      A))))
+  (implies (and a
+              (lol-sublist (list-intersect-iterate-through-a (cdr a)
+                                                             b nil)
+                           (cdr a))
+              (consp a)
+              (tlp (cdr a))
+              (tlp b))
+         (lol-sublist (list-intersect-iterate-through-a a b nil)
+                      a))))
+
 
 ;; Lemma that states that list-intersect-iterate-through-a returns a lol-sublist of a
 (defthm list-intersect-iterate-through-a-returns-lol-sublist-a
   (implies (and (tlp a)
                 (tlp b)
                 (nlolp acc)
-                (no-dups acc)
                 (endp acc)
                 (lol-sublist acc a))
            (lol-sublist (list-intersect-iterate-through-a a b acc) a)))
@@ -434,14 +458,9 @@
                 (lol-sublist (my-list-intersect a b) b))))
 
 
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;; Main Theorem ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
-(definec upper-bound (n :nat) :nat
-  (* (ceiling (/ n 2) 1) (+ (floor (/ n 2) 1) 1)))#|ACL2s-ToDo-Line|#
-
-;; A theorem that states that the total length of all the lists inside of a list of the longest intersections between two lists
-;; is at ((ceiling (n / 2)) * ((floor (n / 2)) + 1)), where n is the length of the smaller of the two given lists.
-(defthm my-list-intersect-shorter-than-upper-bound
+;; A lemma that states that the total length of all the lists inside the output of list-intersect-iterate-through-a
+;; is at most ((ceiling (n / 2)) * ((floor (n / 2)) + 1)), where n is the length of the smaller of the two given lists.
+(defthm list-intersect-iterate-through-a-shorter-than-upper-bound
   (implies (and (tlp a)
                 (tlp b)
                 (nlolp acc)
@@ -450,5 +469,14 @@
                 (lol-sublist acc a)
                 (lol-sublist acc b))
            (<= (all-len (list-intersect-iterate-through-a a b acc))
-               (upper-bound (smaller-len a b))))
-  :hints (("Goal" :use ((:instance my-list-intersect-returns-sublists)))))
+               (upper-bound (smaller-len a b)))))
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;; Main Theorem ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; A theorem that states that the total length of all the lists inside of a list of the longest intersections between two lists
+;; is at most ((ceiling (n / 2)) * ((floor (n / 2)) + 1)), where n is the length of the smaller of the two given lists.
+(defthm my-list-intersect-shorter-than-upper-bound
+  (implies (and (tlp a)
+                (tlp b))
+           (<= (all-len (my-list-intersect a b))
+               (upper-bound (smaller-len a b)))))
